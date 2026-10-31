@@ -47,7 +47,7 @@ class LabeledImages(Dataset):
         self.base = Path(manifest).parent
         self.rows = [r for r in read_manifest(manifest) if r['split'] == split]
         if set(r['label'] for r in self.rows) != set(CLASSES):
-            raise ValueError(f'{split} must contain all three classes')
+            raise ValueError(f'{split} must contain both classes')
         self.transform = image_transform(size, training)
 
     def __len__(self):

@@ -2,13 +2,13 @@
 import torch
 from torch import nn
 
-CLASSES = ('real', 'animated', 'ai_generated')
+CLASSES = ('photo', 'ai_generated')
 
 
 class ImageClassifier(nn.Module):
-    """RGB pixels -> convolutional features -> three unnormalized logits.
+    """RGB pixels -> convolutional features -> two unnormalized logits.
 
-    At 224x224: 3x224x224 -> 32x112x112 -> 64x56x56 -> 128x28x28 -> 128 -> 64 -> 3.
+    At 224x224: 3x224x224 -> 32x112x112 -> 64x56x56 -> 128x28x28 -> 128 -> 64 -> 2.
     BatchNorm learns statistics on training batches. Dropout is disabled in eval().
     """
     def __init__(self):

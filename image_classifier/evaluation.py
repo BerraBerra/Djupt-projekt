@@ -30,14 +30,14 @@ def evaluate(manifest, checkpoint, output):
         writer.writerows(rows)
     metrics = {'accuracy': accuracy_score(truth, predicted), 'test_images': len(truth),
                'checkpoint_epoch': saved['epoch'], 'classes': list(CLASSES),
-               'confusion_matrix': confusion_matrix(truth, predicted, labels=[0, 1, 2]).tolist(),
-               'classification_report': classification_report(truth, predicted, labels=[0, 1, 2],
+               'confusion_matrix': confusion_matrix(truth, predicted, labels=list(range(len(CLASSES)))).tolist(),
+               'classification_report': classification_report(truth, predicted, labels=list(range(len(CLASSES))),
                     target_names=CLASSES, output_dict=True, zero_division=0)}
     summary = (
         f"Test images: {len(truth)}\n"
         f"Checkpoint epoch: {saved['epoch']}\n"
         f"Accuracy: {metrics['accuracy']:.2%}\n\n"
-        + classification_report(truth, predicted, labels=[0, 1, 2],
+        + classification_report(truth, predicted, labels=list(range(len(CLASSES))),
                                 target_names=CLASSES, zero_division=0)
         + "\nConfusion matrix (rows=true, columns=predicted):\n"
         + str(metrics['confusion_matrix']) + "\n"

@@ -1,7 +1,6 @@
 # Image Origin Classifier
 
-A small PyTorch CNN that classifies RGB images as `real`, `animated`, or
-`ai_generated`. The model learns directly from pixels, not precomputed features.
+A small PyTorch CNN that classifies RGB images as `photo` or `ai_generated`. The model learns directly from pixels, not precomputed features.
 
 ## Quick start
 
@@ -40,8 +39,7 @@ image_classifier/
     __init__.py            Python package marker
 data/
     images/
-        real/
-        animated/
+        photo/
         ai_generated/
     manifest.csv           Image paths, labels, splits and source metadata
     README.md              Dataset sources, attribution and limitations
@@ -56,17 +54,16 @@ place: image_classifier/model.py.
 
 ## Data
 
-The current local sample has 4,500 images: 1,500 per class.
+The current local sample has 3,000 images: 1,500 per class.
 Each class has 1,050 training images, 225 validation images and 225 test images.
 Images and manifest.csv must remain together. The manifest fixes the split;
 training only shuffles the order of training examples, not their split membership.
 
-- `real`: photographs, according to source labels.
-- `animated`: cartoons/illustrations, with PACS cartoon used as a proxy.
+- `photo`: photographs, according to source labels.
 - `ai_generated`: generated content, regardless of visual style.
 
-AI origin takes precedence over cartoon style in the intended label policy.
-The current sample does not fully cover AI-generated cartoons or mixed/edited content.
+This is binary classification: photographs versus AI-generated images.
+Non-AI illustrations, cartoons and mixed/edited content are outside the validated scope.
 See data/README.md for sources, revisions, usage restrictions and sampling limitations.
 
 Images are resized to a square without preserving their aspect ratio. This can
@@ -88,18 +85,18 @@ Only training uses random horizontal flips. Pixels are normalized to [-1, 1].
 [B, 128]
   -> Linear(128 -> 64), ReLU, Dropout(0.25)
 [B, 64]
-  -> Linear(64 -> 3)
-[B, 3] logits
+  -> Linear(64 -> 2)
+[B, 2] logits
 ```
 
-There are 101,923 trainable parameters. All layers are trained from random
+There are 101,858 trainable parameters. All layers are trained from random
 initialization; no pretrained weights or frozen layers are used.
 
 Cross-entropy receives logits directly. With label smoothing epsilon=0.05:
 
 ```text
 p_k = softmax(logits)_k
-q_k = (1 - epsilon) * indicator(k == target) + epsilon / 3
+q_k = (1 - epsilon) * indicator(k == target) + epsilon / 2
 loss = -sum_k q_k * log(p_k)
 ```
 
@@ -129,8 +126,8 @@ is not stored. Changing architecture can make an old checkpoint incompatible.
 
 Softmax values sum to one, but are not calibrated probabilities or proof of origin.
 The default review flag below 0.7 confidence is a heuristic, not a validated detector.
-Source/style differences can be easier to learn than genuine AI traces: cartoons
-come from PACS, while photos/AI come from Tiny-GenImage. Exact duplicates were
+Source/style differences can be easier to learn than genuine AI traces.
+Both classes come from the Tiny-GenImage sample. Exact duplicates were
 removed, but near-duplicates and shared subjects may remain. A stronger study
 needs source/generator-held-out testing and more diverse, matched image content.
 

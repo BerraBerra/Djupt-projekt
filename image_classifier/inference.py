@@ -24,7 +24,7 @@ def predict(input_path, checkpoint, output, threshold=.7):
             image = transform(read_rgb(path)).unsqueeze(0)
             with torch.inference_mode():
                 probs = model(image).softmax(1)[0].tolist()
-            guess = max(range(3), key=probs.__getitem__)
+            guess = max(range(len(CLASSES)), key=probs.__getitem__)
             row.update(predicted_label=CLASSES[guess], confidence=probs[guess],
                        needs_review=probs[guess] < threshold,
                        **{f'p_{c}': p for c, p in zip(CLASSES, probs)})

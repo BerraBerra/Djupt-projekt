@@ -1,0 +1,1 @@
+Hur får man ner datan på liu datan sedan? du sa att bilderna inte kommer ner när man köra git clone? en till sak, vi kanske inte skulle ha mer animerade bilder? de är väldigt lätt att skilja ifrpn de andra, kanske vore ett bättre projekt om den bara säger AI eller inte liksom.

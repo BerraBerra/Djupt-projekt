@@ -1,1 +1,1 @@
-"""Supervised image classification: real, animated, AI-generated."""
+"""Supervised image classification: photo and AI-generated."""

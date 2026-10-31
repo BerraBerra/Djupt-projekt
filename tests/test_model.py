@@ -35,7 +35,7 @@ class ModelTests(unittest.TestCase):
             output = folder / 'outputs'
             train(manifest, config, output)
             metrics = evaluate(manifest, output / 'best_model.pt', output)
-            self.assertEqual(metrics['test_images'], 3)
+            self.assertEqual(metrics['test_images'], 2)
             self.assertTrue((output / 'history.csv').exists())
             self.assertTrue((output / 'evaluation.txt').exists())
             self.assertEqual(list(output.glob('*.json')), [])
@@ -50,14 +50,14 @@ class ModelTests(unittest.TestCase):
             output=model(torch.rand(2,3,224,224))
         for handle in handles: handle.remove()
         self.assertEqual(shapes,[(2,32,112,112),(2,64,56,56),(2,128,28,28)])
-        self.assertEqual(tuple(output.shape),(2,3))
+        self.assertEqual(tuple(output.shape),(2,2))
 
     def test_logits_loss_and_gradients(self):
         torch.set_num_threads(2)
         model = ImageClassifier()
         logits = model(torch.rand(4, 3, 32, 32))
-        self.assertEqual(tuple(logits.shape), (4, 3))
-        loss = build_loss()(logits, torch.tensor([0, 1, 2, 0]))
+        self.assertEqual(tuple(logits.shape), (4, 2))
+        loss = build_loss()(logits, torch.tensor([0, 1, 1, 0]))
         loss.backward()
         self.assertTrue(torch.isfinite(loss))
         self.assertGreater(model.features[0].weight.grad.abs().sum().item(), 0)
@@ -82,7 +82,7 @@ class ModelTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temp:
             folder = Path(temp)
             Image.new('RGB', (32, 32)).save(folder/'a.png')
-            rows = [{'path':'a.png','label':'real','split':s,'group_id':'same',
+            rows = [{'path':'a.png','label':'photo','split':s,'group_id':'same',
                      'pixel_sha256':'same-hash'} for s in ['train','test']]
             with (folder/'manifest.csv').open('w',newline='',encoding='utf-8') as handle:
                 writer=csv.DictWriter(handle,fieldnames=rows[0].keys())
