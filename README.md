@@ -1,17 +1,61 @@
 # Image Origin Classifier
 
-A small PyTorch CNN that classifies RGB images as `photo` or `ai_generated`. The model learns directly from pixels, not precomputed features.
+A PyTorch project comparing a small CNN, randomly initialized ResNet18 and pretrained ResNet18 for `photo` versus `ai_generated`. Models learn directly from pixels.
 
 ## Quick start
 
 Use Python 3.11 or newer. From the project folder:
 
+### First-time setup on Linux / LiU
+
+Create an isolated Python environment once on each computer, then activate it:
+
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 python -m pip install -r requirements.txt
+```
+
+The first command creates the `.venv/` directory. Activation makes `python` and
+`python -m pip` use that environment in the current terminal. Packages are installed
+inside the environment, separately from the system Python. The prompt usually
+starts with `(.venv)` when activated.
+
+### Each new terminal or login
+
+Go to the project folder and activate the existing environment before running:
+
+```bash
+source .venv/bin/activate
 python training.py
 python evaluate.py
 python predict.py "path/to/image.jpg"
 ```
+
+You do not need to recreate the environment or reinstall packages on every login.
+Run `deactivate` to leave it. Activation only affects the current terminal.
+Check which interpreter is active with:
+
+```bash
+python -c "import sys; print(sys.executable)"
+```
+
+The path should point inside the project's `.venv/` directory. Activation is optional
+if you explicitly use `.venv/bin/python training.py` instead.
+
+### Windows PowerShell
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python training.py
+```
+
+If activation is unavailable, run `.\.venv\Scripts\python.exe training.py` directly
+and install packages with `.\.venv\Scripts\python.exe -m pip install -r requirements.txt`.
+Create a separate environment on each computer; do not copy a Windows environment
+to Linux. `.venv/` is excluded from Git and does not contain your dataset.
 
 `predict.py` also accepts a folder. CUDA is used automatically during training when
 available; prediction works on CPU. For a GPU server, install the PyTorch build
@@ -22,15 +66,69 @@ The defaults are 224x224, 50 epochs, batch size 32 and learning rate 0.001.
 The terminal shows the current epoch, train/validation phase, percentage, batches,
 estimated remaining time, loss and accuracy. No HTML report or JSON config is required.
 
+## Model and learning rate settings
+
+Select `MODEL` in settings.py: `cnn`, `resnet18_random`, or `resnet18_pretrained`.
+`TRAINING` contains shared settings. `MODEL_SETTINGS` contains per-model overrides:
+both random models start at LR 0.001, while pretrained ResNet18 starts at 0.0001.
+These are starting points, not validated optimal settings. All layers are trainable;
+there is no freezing stage. ResNet18 pretrained weights download on the first
+training run (internet required); saved checkpoints load offline.
+
+Set `TRAINING['learning_rate_type']` to one of:
+
+| Value | Behavior |
+|---|---|
+| `constant` | Keep the starting LR; default for an initial baseline |
+| `linear` | Decrease linearly to `min_learning_rate` at the last planned epoch |
+| `cosinedecay` | Decrease on a cosine curve to the same minimum |
+| `plateau` | Reduce LR by `lr_factor` after more than `lr_patience` epochs without sufficient validation-loss improvement |
+
+Each model has its own optimizer and scheduler. Plateau reductions can occur at
+different epochs despite shared settings. `patience` controls early stopping,
+separately from `lr_patience`; allow time for training after LR reductions.
+Early stopping can end linear/cosine runs before they reach their minimum LR.
+The LR actually used in each epoch appears in the terminal and history.csv.
+
+```bash
+python training.py        # Train the selected MODEL
+python compare_models.py  # Train all three sequentially; summarize validation
+python evaluate_compare.py  # Evaluate all three saved models on the test split
+```
+
+Results live in `outputs/<model_name>/`. comparison.csv summarizes the best
+validation-loss epoch for each model; it does not automatically evaluate test data.
+`evaluate_compare.py` requires all three checkpoints and uses the same test split
+for each model. It prints a table sorted by test accuracy and saves
+`outputs/test_comparison.csv` with accuracy, macro F1, per-class recall, test count
+and checkpoint epoch. Per-model evaluation.txt and test_predictions.csv are also
+updated. It never trains or replaces weights. Use validation for subsequent tuning;
+repeated model selection on test scores compromises an independent final test.
+After selecting settings, use `python evaluate.py` and `python predict.py image.jpg`
+for the selected MODEL, or pass `--checkpoint` explicitly. Re-running a model
+overwrites its outputs: copy them elsewhere before another experiment.
+
+All three models use the same manifest, resize, augmentation and ImageNet
+normalization. The two ResNets differ in initialization and default starting LR;
+set their learning rates equal to isolate initialization more strictly. A single
+seed is not evidence of a stable improvement; repeat with several seeds later.
+The new normalization also changes the small CNN's training conditions relative
+to the original experiment. Old checkpoints retain their original normalization.
+To use an old checkpoint at `outputs/best_model.pt`, pass that path explicitly.
+Starting training always starts a new run; it does not resume a checkpoint.
+
 ## Project structure
 
 ```text
 training.py                Start training
+compare_models.py          Train all models and summarize validation results
 settings.py                All experiment settings and default paths
 evaluate.py                Test the saved model
+evaluate_compare.py        Test all three saved models and compare metrics
 predict.py                 Classify your own images
 image_classifier/
-    model.py               CNN architecture and checkpoint loading
+    model.py               Small CNN, ResNet18 factory and checkpoint loading
+    schedulers.py          Constant, linear, cosine and plateau LR policies
     losses.py              Cross-entropy objective
     data.py                Read images, transforms and fixed splits
     training.py            Optimization, validation and checkpoint selection
@@ -69,7 +167,8 @@ See data/README.md for sources, revisions, usage restrictions and sampling limit
 Images are resized to a square without preserving their aspect ratio. This can
 introduce distortions; the transform is in image_classifier/data.py. Keep the same
 transform for validation, test and prediction when comparing an experiment.
-Only training uses random horizontal flips. Pixels are normalized to [-1, 1].
+Only training uses random horizontal flips. New runs use ImageNet channel means
+and standard deviations; legacy checkpoints use the original [-1, 1] scaling.
 
 ## Architecture and learning objective
 
@@ -89,8 +188,10 @@ Only training uses random horizontal flips. Pixels are normalized to [-1, 1].
 [B, 2] logits
 ```
 
-There are 101,858 trainable parameters. All layers are trained from random
-initialization; no pretrained weights or frozen layers are used.
+The diagram describes the small CNN, with 101,858 trainable parameters and random
+initialization. ResNet18 instead uses residual blocks and a new Linear(512, 2)
+classifier. Its backbone starts randomly or from ImageNet weights; the new
+classifier always starts randomly. No layers are frozen.
 
 Cross-entropy receives logits directly. With label smoothing epsilon=0.05:
 
@@ -110,7 +211,8 @@ The test split is used separately by evaluate.py, never for checkpoint selection
 | File | Created by | Purpose |
 |---|---|---|
 | best_model.pt | training.py | Model weights, settings, class order, epoch and manifest hash |
-| history.csv | training.py | Training/validation loss and accuracy per epoch |
+| history.csv | training.py | Training/validation loss, accuracy and learning rate per epoch |
+| comparison.csv | compare_models.py | Best-validation-epoch results across models |
 | evaluation.txt | evaluate.py | Accuracy, per-class precision/recall/F1 and confusion matrix |
 | test_predictions.csv | evaluate.py | Each test image's label, prediction and scores |
 | predictions.csv | predict.py | Predictions for your own images |
@@ -120,7 +222,8 @@ same output directory can overwrite previous results; change OUTPUT in settings.
 for a new experiment. There are no bundled old models: run training first.
 Checkpoints store settings internally, so no separate config JSON is needed.
 A checkpoint is for inference, not exact training resumption: optimizer/RNG state
-is not stored. Changing architecture can make an old checkpoint incompatible.
+is not stored. Loading reconstructs the architecture recorded in the checkpoint;
+older checkpoints without an architecture name load as the original small CNN.
 
 ## Interpretation and research limitations
 
@@ -145,7 +248,8 @@ source licenses. A fresh clone therefore needs the dataset before training.
 On LiU: clone the code, install dependencies, transfer data, check CUDA availability,
 then run python training.py in the appropriate compute session. No particular
 scheduler or host configuration is assumed. Copy outputs/best_model.pt back to
-use the trained model locally. The old pilot datasets and checkpoints were removed.
+use the trained model locally (new runs use outputs/<model_name>/best_model.pt).
+The old pilot datasets and checkpoints were removed.
 
 ## Tests
 

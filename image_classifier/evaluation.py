@@ -13,7 +13,8 @@ def evaluate(manifest, checkpoint, output):
     output.mkdir(parents=True, exist_ok=True)
     model, saved = load_checkpoint(checkpoint)
     torch.set_num_threads(saved['config']['cpu_threads'])
-    dataset = LabeledImages(manifest, 'test', saved['config']['image_size'])
+    dataset = LabeledImages(manifest, 'test', saved['config']['image_size'],
+                            normalization=saved['config'].get('normalization', 'legacy'))
     rows, truth, predicted = [], [], []
     with torch.inference_mode():
         for images, labels, paths in DataLoader(dataset, batch_size=64):

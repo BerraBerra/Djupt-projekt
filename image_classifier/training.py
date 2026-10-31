@@ -10,7 +10,8 @@ import torch
 from tqdm.auto import tqdm
 from torch.utils.data import DataLoader
 from .data import LabeledImages
-from .model import ImageClassifier, CLASSES
+from .model import build_model, CLASSES
+from .schedulers import build_scheduler, step_scheduler
 from .losses import build_loss
 
 
@@ -30,16 +31,18 @@ def train(manifest, config, output):
     torch.use_deterministic_algorithms(True)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'Device: {device}; input: {config["image_size"]}x{config["image_size"]}; output: {output}', flush=True)
-    datasets = {s: LabeledImages(manifest, s, config['image_size'], s == 'train') for s in ['train', 'val']}
+    datasets = {s: LabeledImages(manifest, s, config['image_size'], s == 'train',
+                config.get('normalization', 'legacy')) for s in ['train', 'val']}
     loaders = {s: DataLoader(d, batch_size=config['batch_size'], shuffle=s == 'train',
                             num_workers=config['num_workers']) for s, d in datasets.items()}
-    model = ImageClassifier().to(device)
+    model = build_model(config.get('model_name', 'cnn')).to(device)
     criterion = build_loss(config['label_smoothing'])
     optimizer = torch.optim.AdamW(model.parameters(), lr=config['learning_rate'],
                                   weight_decay=config['weight_decay'])
+    scheduler = build_scheduler(optimizer, config)
     best, stale, history = float('inf'), 0, []
     for epoch in range(1, config['epochs'] + 1):
-        record = {'epoch': epoch}
+        record = {'epoch': epoch, 'learning_rate': optimizer.param_groups[0]['lr']}
         for split in ['train', 'val']:
             model.train(split == 'train')
             total_loss, correct, count = 0., 0, 0
@@ -61,6 +64,7 @@ def train(manifest, config, output):
             record[split + '_loss'] = total_loss / count
             record[split + '_accuracy'] = correct / count
         history.append(record)
+        print(f"Learning rate used: {record['learning_rate']:.6g}", flush=True)
         print(f"Epoch {epoch:02d}: train loss {record['train_loss']:.3f}, val loss {record['val_loss']:.3f}, val accuracy {record['val_accuracy']:.1%}", flush=True)
         if record['val_loss'] < best:
             best, stale = record['val_loss'], 0
@@ -76,4 +80,6 @@ def train(manifest, config, output):
             writer.writerows(history)
         if stale >= config['patience']:
             break
+        if epoch < config['epochs']:
+            step_scheduler(scheduler, record['val_loss'])
     print(f'Saved best validation checkpoint: {output / "best_model.pt"}', flush=True)

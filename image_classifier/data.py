@@ -9,11 +9,17 @@ from .model import CLASSES
 EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tif', '.tiff'}
 
 
-def image_transform(size, training=False):
+def image_transform(size, training=False, normalization='legacy'):
     operations = [transforms.Resize((size, size), antialias=True)]
     if training:
         operations.append(transforms.RandomHorizontalFlip())
-    operations += [transforms.ToTensor(), transforms.Normalize((.5,)*3, (.5,)*3)]
+    if normalization == 'imagenet':
+        mean, std = (.485, .456, .406), (.229, .224, .225)
+    elif normalization == 'legacy':
+        mean, std = (.5,)*3, (.5,)*3
+    else:
+        raise ValueError(f'Unknown normalization: {normalization}')
+    operations += [transforms.ToTensor(), transforms.Normalize(mean, std)]
     return transforms.Compose(operations)
 
 
@@ -43,12 +49,12 @@ def read_manifest(path):
 
 
 class LabeledImages(Dataset):
-    def __init__(self, manifest, split, size, training=False):
+    def __init__(self, manifest, split, size, training=False, normalization='legacy'):
         self.base = Path(manifest).parent
         self.rows = [r for r in read_manifest(manifest) if r['split'] == split]
         if set(r['label'] for r in self.rows) != set(CLASSES):
             raise ValueError(f'{split} must contain both classes')
-        self.transform = image_transform(size, training)
+        self.transform = image_transform(size, training, normalization)
 
     def __len__(self):
         return len(self.rows)

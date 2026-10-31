@@ -1,4 +1,4 @@
-"""The ONLY model architecture. Random initialization; no downloaded weights."""
+"""Small CNN and ResNet18 variants, with architecture-aware checkpoint loading."""
 import torch
 from torch import nn
 
@@ -25,11 +25,26 @@ class ImageClassifier(nn.Module):
         return self.classifier(self.features(images))
 
 
+def build_model(name='cnn', initialize_pretrained=True):
+    if name == 'cnn':
+        return ImageClassifier()
+    if name not in ('resnet18_random', 'resnet18_pretrained'):
+        raise ValueError(f'Unknown model: {name}')
+    from torchvision.models import resnet18, ResNet18_Weights
+    weights = (ResNet18_Weights.DEFAULT
+               if name == 'resnet18_pretrained' and initialize_pretrained else None)
+    model = resnet18(weights=weights)
+    model.fc = nn.Linear(model.fc.in_features, len(CLASSES))
+    return model
+
+
 def load_checkpoint(path, device='cpu'):
     checkpoint = torch.load(path, map_location=device, weights_only=True)
     if tuple(checkpoint['classes']) != CLASSES:
         raise ValueError('Checkpoint class ordering differs from this project')
-    model = ImageClassifier().to(device)
+    # Saved weights are sufficient; inference never downloads ImageNet weights.
+    model = build_model(checkpoint['config'].get('model_name', 'cnn'),
+                        initialize_pretrained=False).to(device)
     model.load_state_dict(checkpoint['model_state'])
     model.eval()
     return model, checkpoint

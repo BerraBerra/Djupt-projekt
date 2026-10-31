@@ -11,7 +11,8 @@ def predict(input_path, checkpoint, output, threshold=.7):
         raise ValueError('Review threshold must lie between 0 and 1')
     model, saved = load_checkpoint(checkpoint)
     torch.set_num_threads(saved['config']['cpu_threads'])
-    transform = image_transform(saved['config']['image_size'])
+    transform = image_transform(saved['config']['image_size'],
+                                normalization=saved['config'].get('normalization', 'legacy'))
     source = Path(input_path)
     files = sorted(p for p in source.rglob('*') if p.suffix.lower() in EXTENSIONS) if source.is_dir() else [source]
     if not files:
