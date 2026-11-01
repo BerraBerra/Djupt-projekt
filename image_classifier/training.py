@@ -13,9 +13,28 @@ from .data import LabeledImages
 from .model import build_model, CLASSES
 from .schedulers import build_scheduler, step_scheduler
 from .losses import build_loss
+from sklearn.metrics import f1_score
 
 
-def train(manifest, config, output):
+def configure_finetuning(model, mode):
+    if mode not in ('all', 'head', 'last_block'):
+        raise ValueError(f'Unknown fine-tuning mode: {mode}')
+    for name, parameter in model.named_parameters():
+        parameter.requires_grad_(mode == 'all' or name.startswith('fc.') or
+                                 (mode == 'last_block' and name.startswith('layer4.')))
+
+
+def training_mode(model, mode):
+    model.train()
+    if mode != 'all':
+        # Freeze running statistics as well as weights in the frozen backbone.
+        model.eval()
+        model.fc.train()
+        if mode == 'last_block':
+            model.layer4.train()
+
+
+def train(manifest, config, output, epoch_callback=None):
     if config['epochs'] < 1 or config['batch_size'] < 2 or config['patience'] < 1:
         raise ValueError('epochs/patience must be positive and batch_size at least 2')
     if config['image_size'] < 16 or config['learning_rate'] <= 0:
@@ -36,15 +55,26 @@ def train(manifest, config, output):
     loaders = {s: DataLoader(d, batch_size=config['batch_size'], shuffle=s == 'train',
                             num_workers=config['num_workers']) for s, d in datasets.items()}
     model = build_model(config.get('model_name', 'cnn')).to(device)
+    mode = config.get('finetune_mode', 'all')
+    configure_finetuning(model, mode)
     criterion = build_loss(config['label_smoothing'])
-    optimizer = torch.optim.AdamW(model.parameters(), lr=config['learning_rate'],
+    optimizer = torch.optim.AdamW((p for p in model.parameters() if p.requires_grad), lr=config['learning_rate'],
                                   weight_decay=config['weight_decay'])
     scheduler = build_scheduler(optimizer, config)
     best, stale, history = float('inf'), 0, []
+    selection = config.get('selection_metric', 'val_loss')
+    if selection not in ('val_loss', 'val_macro_f1'):
+        raise ValueError('Unsupported selection metric')
+    best_score = float('-inf')
+    best_record = None
     for epoch in range(1, config['epochs'] + 1):
         record = {'epoch': epoch, 'learning_rate': optimizer.param_groups[0]['lr']}
         for split in ['train', 'val']:
-            model.train(split == 'train')
+            if split == 'train':
+                training_mode(model, mode)
+            else:
+                model.eval()
+            truth, guesses = [], []
             total_loss, correct, count = 0., 0, 0
             progress = tqdm(loaders[split], desc=f'Epoch {epoch}/{config["epochs"]} | {split}',
                             unit='batch', dynamic_ncols=True, mininterval=1)
@@ -60,13 +90,18 @@ def train(manifest, config, output):
                 total_loss += loss.item() * len(labels)
                 correct += (logits.argmax(1) == labels).sum().item()
                 count += len(labels)
+                truth.extend(labels.detach().cpu().tolist())
+                guesses.extend(logits.detach().argmax(1).cpu().tolist())
                 progress.set_postfix(loss=f'{total_loss/count:.3f}', accuracy=f'{correct/count:.1%}', refresh=False)
             record[split + '_loss'] = total_loss / count
             record[split + '_accuracy'] = correct / count
+            record[split + '_macro_f1'] = f1_score(truth, guesses, labels=[0, 1], average='macro', zero_division=0)
         history.append(record)
         print(f"Learning rate used: {record['learning_rate']:.6g}", flush=True)
         print(f"Epoch {epoch:02d}: train loss {record['train_loss']:.3f}, val loss {record['val_loss']:.3f}, val accuracy {record['val_accuracy']:.1%}", flush=True)
-        if record['val_loss'] < best:
+        score = -record['val_loss'] if selection == 'val_loss' else record[selection]
+        if score > best_score:
+            best_score, best_record = score, dict(record)
             best, stale = record['val_loss'], 0
             torch.save({'model_state': model.state_dict(), 'classes': list(CLASSES),
                         'config': config, 'epoch': epoch, 'validation_loss': best,
@@ -78,8 +113,11 @@ def train(manifest, config, output):
             writer = csv.DictWriter(handle, fieldnames=history[0].keys())
             writer.writeheader()
             writer.writerows(history)
+        if epoch_callback is not None:
+            epoch_callback(record, best_record)
         if stale >= config['patience']:
             break
         if epoch < config['epochs']:
             step_scheduler(scheduler, record['val_loss'])
     print(f'Saved best validation checkpoint: {output / "best_model.pt"}', flush=True)
+    return best_record

@@ -1,0 +1,4 @@
+recorded_date,experiment,model,checkpoint_epoch,test_images,correct,errors,test_accuracy_percent,macro_f1_rounded,photo_pred_photo,photo_pred_ai,ai_pred_photo,ai_pred_ai,provenance,configuration_status
+2026-11-01,baseline_comparison,cnn,46,450,367,83,81.56,0.816,184,41,42,183,user_supplied_evaluate_compare_output,remote_config_not_verified
+2026-11-01,baseline_comparison,resnet18_random,11,450,312,138,69.33,0.693,157,68,70,155,user_supplied_evaluate_compare_output,remote_config_not_verified
+2026-11-01,baseline_comparison,resnet18_pretrained,24,450,416,34,92.44,0.924,211,14,20,205,user_supplied_evaluate_compare_output,remote_config_not_verified

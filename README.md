@@ -119,6 +119,64 @@ Starting training always starts a new run; it does not resume a checkpoint.
 
 ## Project structure
 
+## Automated pretrained ResNet18 search
+
+Install requirements, then run `python search_pretrained.py`. This runs only
+ImageNet-pretrained ResNet18. Edit search_settings.py for the search budget and
+ranges. The defaults are 24 sequential trials over initial LR, weight decay,
+batch size, fine-tuning mode and LR schedule. All other training settings come
+from settings.py. Each trial starts from ImageNet weights, not the previous trial.
+Frozen blocks retain frozen BatchNorm running statistics as well as frozen weights.
+
+Trials select checkpoints and early-stop on validation macro F1 (ties keep the
+earlier checkpoint). Plateau scheduling still monitors validation loss. TPE chooses
+combinations; median pruning may end weak trials after a 15-epoch warm-up and six
+startup trials. This is a search budget, not a guarantee of a global optimum.
+
+Each invocation creates outputs/search_pretrained/<timestamp>/ with study.db,
+validation_ranking.csv, effective settings, environment information and separate
+trial folders containing checkpoints and histories. JSON files here are generated
+reproducibility records, not additional user-edited configuration files. Pruned
+and failed trials are recorded but excluded from the completed-trial ranking.
+Test data is never evaluated during search.
+
+The ranking prints automatically after every trial. To display it later without
+training or evaluating the test split:
+
+```bash
+python search_pretrained.py --study-dir outputs/search_pretrained/YOUR_TIMESTAMP --report-only
+```
+
+To add another SEARCH['trials'] trials to that study, omit --report-only.
+Changed code, data manifest or effective settings require a new study. Resuming
+adds trials; it does not resume an interrupted trial's optimizer or reproduce the
+exact uninterrupted sampler sequence. Run only one process per study. CUDA OOM
+trials are marked failed and skipped; unexpected errors stop for investigation.
+
+The first stage uses one seed. Its highest-scoring trial is a provisional winner;
+confirm finalists with multiple seeds before a final test. Automatic finalist
+seed replication is not part of this search script yet. Existing compare_models.py
+and evaluate_compare.py operate on the old baseline folders, not these trials.
+
+The recorded baseline results and limitations are in `reports/baseline_report.md`;
+`reports/experiment_log.csv` stores the exact counts and printed metrics provided
+from the LiU evaluation. These files are versioned, unlike generated outputs.
+
+To investigate pretrained ResNet18 further, run:
+
+```bash
+python pretrained_experiments.py
+```
+
+This trains three new models from ImageNet initialization using constant, plateau
+and cosine schedules. Change `EXPERIMENT_SETTINGS` and `SCHEDULES` in that script;
+other settings are inherited from settings.py. All runs use the same seed and
+split. No test evaluation is performed. Each invocation creates a timestamped
+folder under outputs/pretrained_experiments containing per-run settings.txt,
+history.csv, best_model.pt and a shared validation_comparison.csv. The baseline
+outputs are preserved. This does not resume the previously trained 92.44% model.
+Remote baseline histories and checkpoints must still be backed up on LiU.
+
 ```text
 training.py                Start training
 compare_models.py          Train all models and summarize validation results
