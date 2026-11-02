@@ -1,5 +1,10 @@
 # Photo versus AI: baseline model comparison
 
+Follow-up recorded on 2026-11-02: [first hyperparameter search](search_round_1.md).
+It documents nine completed validation trials and the rationale for the next
+experiments. The plan below is retained as historical context; the subsequent
+Optuna search selects by validation macro F1 rather than validation loss.
+
 Recorded: 2026-11-01. Source: evaluation output supplied by the project author
 from a LiU computer. This is the date the results were recorded, not a verified
 training date. The remote checkpoints and training histories have not been inspected.

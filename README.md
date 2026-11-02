@@ -121,6 +121,28 @@ Starting training always starts a new run; it does not resume a checkpoint.
 
 ## Automated pretrained ResNet18 search
 
+**Current default: round 2 controlled follow-up (2026-11-02).**
+`python search_pretrained.py` now runs five named configurations with seeds
+42, 43 and 44 (15 runs). The reference uses LiU trial 6's exact LR and weight decay,
+batch 64, last-block fine-tuning and cosine decay. Variants change only batch to 32,
+schedule to plateau, schedule to constant, or fine-tuning to all layers.
+Edit REFERENCE, VARIANTS and SEEDS in search_settings.py; epochs and patience
+remain in SEARCH. The historical trials/SPACE settings are not used for round 2.
+Optuna records a fixed queue; adaptive sampling and pruning are disabled for this
+comparison, but per-run early stopping remains enabled.
+
+`variant_summary.csv` reports mean validation macro F1, sample standard deviation
+and mean accuracy across seeds. Compare groups with all three seeds completed;
+incomplete groups are explicitly provisional. validation_ranking.csv contains
+individual runs, including variant and seed. All selection uses validation only.
+
+A new invocation makes a new folder and preserves the old studies. Continuing a
+round 2 folder with --study-dir runs only missing combinations and retries failed
+or interrupted combinations from ImageNet in new trial folders. It does not resume
+weights mid-training. Never run two processes on the same study. Existing round 1
+studies can still be viewed with --report-only, but must not be continued using
+the new code. The description below documents the historical round 1 search.
+
 Install requirements, then run `python search_pretrained.py`. This runs only
 ImageNet-pretrained ResNet18. Edit search_settings.py for the search budget and
 ranges. The defaults are 24 sequential trials over initial LR, weight decay,
