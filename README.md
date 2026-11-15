@@ -1,5 +1,7 @@
 # Image Origin Classifier
 
+[Start here: chronological project journal](reports/project_journal.md) · [Project findings and continuation plan, 15 November 2026](reports/project_status_2026-11-15.md)
+
 A PyTorch project comparing a small CNN, randomly initialized ResNet18 and pretrained ResNet18 for `photo` versus `ai_generated`. Models learn directly from pixels.
 
 ## Quick start

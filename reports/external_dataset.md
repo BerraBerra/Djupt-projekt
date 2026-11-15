@@ -50,6 +50,45 @@ recall separately for each generator, and photo recall by source. Preserve the
 checkpoint hash, manifest hash and every prediction. No evaluation of that remote
 checkpoint has yet been performed as part of dataset preparation.
 
+## External evaluation result (2026-11-15)
+
+The LiU terminal output supplied by the author identifies trial_0004, checkpoint
+epoch 19, and evaluation folder `outputs/external_evaluation/20261115_142005_812160`.
+The checkpoint correctly classified 1,247 of 2,000 external images (62.35%).
+The terminal reported macro F1 of 0.62. Counts below are from its confusion matrix.
+
+| True class | Predicted photo | Predicted AI | Recall |
+|---|---:|---:|---:|
+| Photo | 695 | 305 | 69.5% |
+| AI-generated | 448 | 552 | 55.2% |
+
+The same checkpoint scored 92.00% on the original validation split. External
+accuracy was 29.65 percentage points lower. This comparison measures performance
+across two image sets, one of which was used for checkpoint selection. The cause
+of the gap remains unresolved.
+
+### Recall by generator and photo source
+
+The author supplied the following counts from the same run's `source_results.csv`.
+Recall is the fraction of images in each row assigned their true class.
+
+| True class | Generator or source | Correct / total | Recall |
+|---|---|---:|---:|
+| AI | DFGAN | 51 / 200 | 25.5% |
+| AI | FLUX-dev | 161 / 200 | 80.5% |
+| AI | FLUX-schnell | 137 / 200 | 68.5% |
+| AI | Firefly Image 2 | 83 / 200 | 41.5% |
+| AI | Firefly Image 3 | 120 / 200 | 60.0% |
+| Photo | COCO | 649 / 817 | 79.4% |
+| Photo | FFHQ | 46 / 183 | 25.1% |
+
+The subgroup totals reproduce the confusion matrix (552 AI images and 695 photos
+correct). DFGAN and Firefly Image 2 account for 266 of the 448 AI images classified
+as photos. The model labeled 137 of the 183 FFHQ photos as AI. COCO contributes
+most of the photo examples, so aggregate photo recall (69.5%) conceals the low
+FFHQ recall. Image content, encoding and resolution may vary with source. These
+counts alone cannot identify which image characteristics drove the decisions.
+
 ## Scope and caveats
 
 This is a custom source-shift evaluation, not a representative random sample of
