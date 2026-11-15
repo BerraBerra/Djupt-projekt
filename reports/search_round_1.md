@@ -1,5 +1,8 @@
 # Pretrained ResNet18: first hyperparameter search
 
+Follow-up results: [controlled three-seed comparison](search_round_2.md).
+The planned 15 runs have now been reported; historical plans below are retained.
+
 Recorded: 2026-11-02.
 Study ID: 20261101_185748_129895 (LiU).
 Evidence: nine rows from validation_ranking.csv supplied by the project author.

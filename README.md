@@ -232,6 +232,58 @@ place: image_classifier/model.py.
 
 ## Data
 
+### External evaluation (never used for training)
+
+The prepared 2,000-image local subset can also be transferred using
+transfer/community_forensics_external_2000.zip (about 625 MB). Put the ZIP in the
+LiU project root and run `unzip community_forensics_external_2000.zip`. Its paths
+already include data/external_community. This avoids downloading from the source
+again and does not require requirements-data.txt. Transfer is separate from Git.
+
+The optional Community Forensics subset lives in data/external_community, separate
+from data/manifest.csv and the existing training split. Prepare the same subset on
+LiU using the same original 3,000-image dataset:
+
+```bash
+python -m pip install -r requirements-data.txt
+python prepare_external.py
+```
+
+The default is 1,000 photos from COCO/FFHQ and 1,000 generated images (200 each
+from DFGAN, FLUX-dev, FLUX-schnell, Firefly_Image2 and Firefly_Image3). The script
+reads pinned remote Parquet metadata and downloads selected row groups, not the
+full 206 GB dataset. It saves original encoded files, source identifiers, checksums
+and provenance. Its 8 GB image-column transfer budget excludes metadata/retries.
+An existing completed manifest is never replaced. An interrupted preparation can
+be rerun, but will replay the deterministic selection/downloads rather than resume
+exactly at the interruption. Partial manifests are not used for evaluation.
+
+Exact decoded-pixel duplicates and conservative dHash matches (distance <=4) are
+excluded against the original dataset and already accepted images. This screening
+can have false positives and miss crops or semantically related images. It is not
+proof of full independence. Sampling homogeneous row groups <=32 MiB makes this
+a resource-bounded custom subset; generator/source distributions differ from the
+full benchmark. Photo and generated source/encoding distributions are not matched.
+Do not report its results as the official benchmark or as a pure generator effect.
+
+Use the checkpoint selected on the ORIGINAL validation split:
+
+```bash
+python evaluate_external.py --checkpoint outputs/search_pretrained/20261102_084414_406073/trial_0004/best_model.pt
+```
+
+This does not retrain or tune thresholds. Results go into a new timestamped
+outputs/external_evaluation folder: evaluation.txt, test_predictions.csv,
+source_results.csv and evaluation_provenance.json. source_results.csv reports AI
+recall per generator and photo recall per real source (not per-generator accuracy).
+The checkpoint and external manifest hashes identify the exact evaluation.
+
+Community Forensics-Eval is distributed for non-commercial research/education
+under CC-BY-NC-SA-4.0 with applicable source/model terms. Cite Park and Owens,
+CVPR 2025, as well as COCO and FFHQ. The downloaded SOURCE_README.md preserves
+the upstream attribution. Do not add images or model weights to Git. See
+reports/external_dataset.md for the preparation record and limitations.
+
 The current local sample has 3,000 images: 1,500 per class.
 Each class has 1,050 training images, 225 validation images and 225 test images.
 Images and manifest.csv must remain together. The manifest fixes the split;

@@ -1,0 +1,5 @@
+# Only needed to prepare the external evaluation dataset.
+pyarrow>=19,<24
+requests>=2.32,<3
+Pillow>=10,<13
+tqdm>=4.66,<5
